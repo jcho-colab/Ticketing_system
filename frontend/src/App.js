@@ -56,7 +56,6 @@ const AuthProvider = ({ children }) => {
       localStorage.setItem('token', newToken);
       setToken(newToken);
       setUser(userData);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
       return { success: true };
     } catch (error) {
