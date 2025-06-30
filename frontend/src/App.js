@@ -889,7 +889,12 @@ const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
 
   const fetchComments = async () => {
     try {
-      const response = await axios.get(`${API}/tickets/${ticket.id}/comments`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/tickets/${ticket.id}/comments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setComments(response.data);
     } catch (error) {
       console.error('Failed to fetch comments:', error);
