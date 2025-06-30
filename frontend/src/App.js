@@ -328,7 +328,9 @@ const Dashboard = () => {
   const fetchTickets = async () => {
     try {
       setLoading(true);
+      console.log('Fetching tickets...');
       const response = await axios.get(`${API}/tickets`);
+      console.log('Tickets fetched:', response.data);
       setTickets(response.data);
     } catch (error) {
       console.error('Failed to fetch tickets:', error);
