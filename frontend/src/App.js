@@ -683,7 +683,14 @@ const CreateTicketForm = ({ onTicketCreated }) => {
         priority: 'medium',
         category: 'general'
       });
-      onTicketCreated();
+      
+      // Refresh the tickets list
+      if (onTicketCreated) {
+        onTicketCreated();
+      }
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       setError(error.response?.data?.detail || 'Failed to create ticket');
     } finally {
@@ -709,7 +716,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
           
           {success && (
             <div className="bg-green-50 border border-green-300 text-green-700 px-4 py-3 rounded">
-              Ticket created successfully!
+              ✅ Ticket created successfully! You can view it in the Tickets tab.
             </div>
           )}
 
@@ -782,6 +789,279 @@ const CreateTicketForm = ({ onTicketCreated }) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+// Ticket Modal Component
+const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [users, setUsers] = useState([]);
+
+  const canUpdateTicket = user?.role !== 'end_user';
+  const canAddInternalComments = user?.role !== 'end_user';
+
+  useEffect(() => {
+    fetchComments();
+    if (canUpdateTicket) {
+      fetchUsers();
+    }
+  }, [ticket.id]);
+
+  const fetchComments = async () => {
+    try {
+      const response = await axios.get(`${API}/tickets/${ticket.id}/comments`);
+      setComments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch comments:', error);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/users`);
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    }
+  };
+
+  const addComment = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/tickets/${ticket.id}/comments`, {
+        content: newComment,
+        is_internal: isInternal
+      });
+      
+      setComments([...comments, response.data]);
+      setNewComment('');
+      setIsInternal(false);
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateTicketStatus = async (newStatus) => {
+    setUpdating(true);
+    try {
+      await axios.put(`${API}/tickets/${ticket.id}`, { status: newStatus });
+      ticket.status = newStatus; // Update local state
+      onUpdate(); // Refresh tickets list
+    } catch (error) {
+      console.error('Failed to update ticket:', error);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const assignTicket = async (userId) => {
+    setUpdating(true);
+    try {
+      await axios.put(`${API}/tickets/${ticket.id}`, { assigned_to: userId });
+      onUpdate(); // Refresh tickets list
+    } catch (error) {
+      console.error('Failed to assign ticket:', error);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open': return 'bg-blue-100 text-blue-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-6">
+          <div className="flex-1">
+            <div className="flex items-center space-x-3 mb-2">
+              <h3 className="text-lg font-medium text-gray-900">{ticket.title}</h3>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(ticket.priority)}`}>
+                {ticket.priority}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
+                {ticket.status.replace('_', ' ')}
+              </span>
+            </div>
+            <div className="text-sm text-gray-500 space-x-4">
+              <span>#{ticket.id.substring(0, 8)}</span>
+              <span>Created by {ticket.created_by_name}</span>
+              <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+              {ticket.assigned_to_name && (
+                <span>Assigned to {ticket.assigned_to_name}</span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl font-semibold"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            {/* Description */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <h4 className="font-medium text-gray-900 mb-2">Description</h4>
+              <p className="text-gray-700 whitespace-pre-wrap">{ticket.description}</p>
+            </div>
+
+            {/* Comments */}
+            <div className="mb-6">
+              <h4 className="font-medium text-gray-900 mb-4">Comments ({comments.length})</h4>
+              <div className="space-y-4 max-h-64 overflow-y-auto">
+                {comments.map((comment) => (
+                  <div key={comment.id} className={`p-3 rounded-lg ${comment.is_internal ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border border-gray-200'}`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-sm">{comment.user_name}</span>
+                        {comment.is_internal && (
+                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Internal</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {new Date(comment.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700">{comment.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Add Comment */}
+            <form onSubmit={addComment} className="space-y-4">
+              <div>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  rows={3}
+                  className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                {canAddInternalComments && (
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={isInternal}
+                      onChange={(e) => setIsInternal(e.target.checked)}
+                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-600">Internal note (not visible to end user)</span>
+                  </label>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading || !newComment.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {loading ? 'Adding...' : 'Add Comment'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Sidebar */}
+          <div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-4">Ticket Details</h4>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Category</label>
+                  <p className="text-sm text-gray-900 capitalize">{ticket.category}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Created</label>
+                  <p className="text-sm text-gray-900">{new Date(ticket.created_at).toLocaleString()}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Last Updated</label>
+                  <p className="text-sm text-gray-900">{new Date(ticket.updated_at).toLocaleString()}</p>
+                </div>
+
+                {canUpdateTicket && (
+                  <>
+                    <hr className="my-4" />
+                    
+                    {/* Status Update */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">Update Status</label>
+                      <div className="space-y-2">
+                        {['open', 'in_progress', 'resolved', 'closed'].map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => updateTicketStatus(status)}
+                            disabled={updating || ticket.status === status}
+                            className={`w-full text-left px-3 py-2 text-sm rounded ${
+                              ticket.status === status
+                                ? 'bg-indigo-100 text-indigo-800 cursor-not-allowed'
+                                : 'bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {status.replace('_', ' ').toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Assignment */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-2 block">Assign To</label>
+                      <select
+                        onChange={(e) => assignTicket(e.target.value)}
+                        disabled={updating}
+                        value={ticket.assigned_to || ''}
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      >
+                        <option value="">Unassigned</option>
+                        {users.filter(u => u.role !== 'end_user').map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
