@@ -460,7 +460,7 @@ const Dashboard = () => {
 };
 
 // Tickets List Component
-const TicketsList = ({ tickets, loading, onRefresh }) => {
+const TicketsList = ({ tickets, loading, onRefresh, onTicketClick }) => {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'critical': return 'bg-red-100 text-red-800';
