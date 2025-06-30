@@ -441,10 +441,20 @@ const Dashboard = () => {
         </div>
 
         {/* Content Area */}
-        {activeTab === 'tickets' && <TicketsList tickets={tickets} loading={loading} onRefresh={fetchTickets} />}
+        {activeTab === 'tickets' && <TicketsList tickets={tickets} loading={loading} onRefresh={fetchTickets} onTicketClick={openTicketModal} />}
         {activeTab === 'dashboard' && user?.role !== 'end_user' && <DashboardStats stats={stats} />}
         {activeTab === 'create' && <CreateTicketForm onTicketCreated={fetchTickets} />}
       </div>
+
+      {/* Ticket Detail Modal */}
+      {showTicketModal && selectedTicket && (
+        <TicketModal 
+          ticket={selectedTicket} 
+          onClose={() => setShowTicketModal(false)}
+          onUpdate={fetchTickets}
+          user={user}
+        />
+      )}
     </div>
   );
 };
