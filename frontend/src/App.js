@@ -361,7 +361,12 @@ const Dashboard = () => {
 
   const openTicketModal = async (ticketId) => {
     try {
-      const response = await axios.get(`${API}/tickets/${ticketId}`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/tickets/${ticketId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setSelectedTicket(response.data);
       setShowTicketModal(true);
     } catch (error) {
