@@ -944,7 +944,12 @@ const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
   const updateTicketStatus = async (newStatus) => {
     setUpdating(true);
     try {
-      await axios.put(`${API}/tickets/${ticket.id}`, { status: newStatus });
+      const token = localStorage.getItem('token');
+      await axios.put(`${API}/tickets/${ticket.id}`, { status: newStatus }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       ticket.status = newStatus; // Update local state
       onUpdate(); // Refresh tickets list
     } catch (error) {
