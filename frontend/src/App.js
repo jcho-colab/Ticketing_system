@@ -903,7 +903,12 @@ const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API}/users`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       setUsers(response.data);
     } catch (error) {
       console.error('Failed to fetch users:', error);
