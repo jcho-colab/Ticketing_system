@@ -509,7 +509,7 @@ const TicketsList = ({ tickets, loading, onRefresh, onTicketClick }) => {
             </li>
           ) : (
             tickets.map((ticket) => (
-              <li key={ticket.id} className="px-6 py-4 hover:bg-gray-50">
+              <li key={ticket.id} className="px-6 py-4 hover:bg-gray-50 cursor-pointer" onClick={() => onTicketClick(ticket.id)}>
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-3">
