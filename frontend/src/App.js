@@ -259,7 +259,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               name="email"
               required
               value={formData.email}
-              onChange={handleChange}
+              onChange={handleInputChange}
               className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               placeholder="Enter your email"
             />
@@ -271,7 +271,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
               name="password"
               required
               value={formData.password}
-              onChange={handleChange}
+              onChange={handleInputChange}
               className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               placeholder="Enter your password"
             />
@@ -281,7 +281,7 @@ const RegisterForm = ({ onSwitchToLogin }) => {
             <select
               name="role"
               value={formData.role}
-              onChange={handleChange}
+              onChange={handleInputChange}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             >
               <option value="end_user">End User</option>
@@ -782,7 +782,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
               required
               maxLength={120}
               value={formData.title}
-              onChange={handleChange}
+              onChange={handleInputChange}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="Brief description of the issue"
             />
@@ -796,7 +796,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
               required
               rows={4}
               value={formData.description}
-              onChange={handleChange}
+              onChange={handleInputChange}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               placeholder="Detailed description of the issue..."
             />
@@ -808,7 +808,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
               <select
                 name="priority"
                 value={formData.priority}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="low">Low</option>
@@ -823,7 +823,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
               <select
                 name="category"
                 value={formData.category}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="general">General</option>
