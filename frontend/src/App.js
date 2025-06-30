@@ -962,7 +962,12 @@ const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
   const assignTicket = async (userId) => {
     setUpdating(true);
     try {
-      await axios.put(`${API}/tickets/${ticket.id}`, { assigned_to: userId });
+      const token = localStorage.getItem('token');
+      await axios.put(`${API}/tickets/${ticket.id}`, { assigned_to: userId }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       onUpdate(); // Refresh tickets list
     } catch (error) {
       console.error('Failed to assign ticket:', error);
