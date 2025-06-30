@@ -675,7 +675,9 @@ const CreateTicketForm = ({ onTicketCreated }) => {
     setSuccess(false);
 
     try {
-      await axios.post(`${API}/tickets`, formData);
+      const response = await axios.post(`${API}/tickets`, formData);
+      console.log('Ticket created:', response.data);
+      
       setSuccess(true);
       setFormData({
         title: '',
@@ -684,14 +686,17 @@ const CreateTicketForm = ({ onTicketCreated }) => {
         category: 'general'
       });
       
-      // Refresh the tickets list
-      if (onTicketCreated) {
-        onTicketCreated();
-      }
+      // Refresh the tickets list with a slight delay to ensure state updates
+      setTimeout(() => {
+        if (onTicketCreated) {
+          onTicketCreated();
+        }
+      }, 100);
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
+      console.error('Failed to create ticket:', error);
       setError(error.response?.data?.detail || 'Failed to create ticket');
     } finally {
       setLoading(false);
