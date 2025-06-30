@@ -681,13 +681,15 @@ const CreateTicketForm = ({ onTicketCreated }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
     setLoading(true);
     setError('');
     setSuccess(false);
 
     try {
+      console.log('Sending request to:', `${API}/tickets`);
       const response = await axios.post(`${API}/tickets`, formData);
-      console.log('Ticket created:', response.data);
+      console.log('Ticket created successfully:', response.data);
       
       setSuccess(true);
       setFormData({
@@ -699,6 +701,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
       
       // Refresh the tickets list with a slight delay to ensure state updates
       setTimeout(() => {
+        console.log('Calling onTicketCreated callback');
         if (onTicketCreated) {
           onTicketCreated();
         }
