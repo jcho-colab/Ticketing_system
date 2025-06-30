@@ -444,7 +444,15 @@ const Dashboard = () => {
         </div>
 
         {/* Content Area */}
-        {activeTab === 'tickets' && <TicketsList tickets={tickets} loading={loading} onRefresh={fetchTickets} onTicketClick={openTicketModal} />}
+        {activeTab === 'tickets' && (
+          <div>
+            <TicketsList tickets={tickets} loading={loading} onRefresh={fetchTickets} onTicketClick={openTicketModal} />
+            {/* Debug info */}
+            <div className="mt-4 text-xs text-gray-500">
+              Debug: {tickets.length} tickets loaded, User role: {user?.role}
+            </div>
+          </div>
+        )}
         {activeTab === 'dashboard' && user?.role !== 'end_user' && <DashboardStats stats={stats} />}
         {activeTab === 'create' && <CreateTicketForm onTicketCreated={fetchTickets} />}
       </div>
