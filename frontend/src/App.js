@@ -315,6 +315,8 @@ const Dashboard = () => {
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showTicketModal, setShowTicketModal] = useState(false);
 
   useEffect(() => {
     fetchTickets();
@@ -341,6 +343,16 @@ const Dashboard = () => {
       setStats(response.data);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+    }
+  };
+
+  const openTicketModal = async (ticketId) => {
+    try {
+      const response = await axios.get(`${API}/tickets/${ticketId}`);
+      setSelectedTicket(response.data);
+      setShowTicketModal(true);
+    } catch (error) {
+      console.error('Failed to fetch ticket details:', error);
     }
   };
 
