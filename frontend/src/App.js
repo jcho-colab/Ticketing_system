@@ -754,6 +754,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
       ...prev,
       [name]: value
     }));
+  };
 
   return (
     <div className="max-w-2xl">
