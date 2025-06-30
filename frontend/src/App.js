@@ -921,9 +921,14 @@ const TicketModal = ({ ticket, onClose, onUpdate, user }) => {
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
       const response = await axios.post(`${API}/tickets/${ticket.id}/comments`, {
         content: newComment,
         is_internal: isInternal
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       setComments([...comments, response.data]);
