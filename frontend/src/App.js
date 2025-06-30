@@ -696,7 +696,9 @@ const CreateTicketForm = ({ onTicketCreated }) => {
     console.log('=== FORM SUBMISSION STARTED ===');
     console.log('Form data:', formData);
     console.log('API URL:', `${API}/tickets`);
-    console.log('Token:', localStorage.getItem('token'));
+    
+    const token = localStorage.getItem('token');
+    console.log('Token:', token ? 'Present' : 'Missing');
     
     // Validate form
     if (!formData.title || !formData.description) {
@@ -712,8 +714,13 @@ const CreateTicketForm = ({ onTicketCreated }) => {
     try {
       console.log('Making API request...');
       
-      // Use the simple axios approach that works elsewhere
-      const response = await axios.post(`${API}/tickets`, formData);
+      // Use explicit headers to avoid global axios configuration issues
+      const response = await axios.post(`${API}/tickets`, formData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       console.log('API response received:', response);
       console.log('Response status:', response.status);
