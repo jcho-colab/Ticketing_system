@@ -335,7 +335,12 @@ const Dashboard = () => {
     try {
       setLoading(true);
       console.log('Fetching tickets...');
-      const response = await axios.get(`${API}/tickets`);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/tickets`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       console.log('Tickets fetched:', response.data);
       setTickets(response.data);
     } catch (error) {
