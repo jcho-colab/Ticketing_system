@@ -690,6 +690,8 @@ const CreateTicketForm = ({ onTicketCreated }) => {
     
     console.log('=== FORM SUBMISSION STARTED ===');
     console.log('Form data:', formData);
+    console.log('API URL:', `${API}/tickets`);
+    console.log('Token:', localStorage.getItem('token'));
     
     // Validate form
     if (!formData.title || !formData.description) {
@@ -704,19 +706,13 @@ const CreateTicketForm = ({ onTicketCreated }) => {
     
     try {
       console.log('Making API request...');
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      };
       
-      const response = await axios({
-        method: 'POST',
-        url: `${API}/tickets`,
-        data: formData,
-        headers: headers
-      });
+      // Use the simple axios approach that works elsewhere
+      const response = await axios.post(`${API}/tickets`, formData);
       
-      console.log('API response:', response);
+      console.log('API response received:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
       
       if (response.status === 200) {
         console.log('Ticket created successfully!');
@@ -736,13 +732,15 @@ const CreateTicketForm = ({ onTicketCreated }) => {
           onTicketCreated();
         }
         
-        // Hide success message after 3 seconds
-        setTimeout(() => setSuccess(false), 3000);
+        // Hide success message after 5 seconds
+        setTimeout(() => setSuccess(false), 5000);
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
+      console.error('Error response:', error.response);
       setError(error.response?.data?.detail || 'Failed to create ticket');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
