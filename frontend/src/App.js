@@ -679,47 +679,76 @@ const CreateTicketForm = ({ onTicketCreated }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log('Form submitted with data:', formData);
+  // Simple form submission handler
+  const handleFormSubmit = async (event) => {
+    event.preventDefault();
+    
+    console.log('=== FORM SUBMISSION STARTED ===');
+    console.log('Form data:', formData);
+    
+    // Validate form
+    if (!formData.title || !formData.description) {
+      console.log('Form validation failed');
+      setError('Title and description are required');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     setSuccess(false);
-
+    
     try {
-      console.log('Sending request to:', `${API}/tickets`);
-      const response = await axios.post(`${API}/tickets`, formData);
-      console.log('Ticket created successfully:', response.data);
+      console.log('Making API request...');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      };
       
-      setSuccess(true);
-      setFormData({
-        title: '',
-        description: '',
-        priority: 'medium',
-        category: 'general'
+      const response = await axios({
+        method: 'POST',
+        url: `${API}/tickets`,
+        data: formData,
+        headers: headers
       });
       
-      // Refresh the tickets list with a slight delay to ensure state updates
-      setTimeout(() => {
-        console.log('Calling onTicketCreated callback');
+      console.log('API response:', response);
+      
+      if (response.status === 200) {
+        console.log('Ticket created successfully!');
+        setSuccess(true);
+        
+        // Reset form
+        setFormData({
+          title: '',
+          description: '',
+          priority: 'medium',
+          category: 'general'
+        });
+        
+        // Call callback
         if (onTicketCreated) {
+          console.log('Calling onTicketCreated callback');
           onTicketCreated();
         }
-      }, 100);
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => setSuccess(false), 3000);
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => setSuccess(false), 3000);
+      }
     } catch (error) {
-      console.error('Failed to create ticket:', error);
+      console.error('Error creating ticket:', error);
       setError(error.response?.data?.detail || 'Failed to create ticket');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    console.log(`Input changed: ${name} = ${value}`);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
   return (
     <div className="max-w-2xl">
