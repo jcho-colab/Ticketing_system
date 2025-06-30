@@ -214,8 +214,13 @@ const RegisterForm = ({ onSwitchToLogin }) => {
     setLoading(false);
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    console.log(`Input changed: ${name} = ${value}`);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   return (
