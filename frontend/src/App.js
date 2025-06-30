@@ -755,7 +755,7 @@ const CreateTicketForm = ({ onTicketCreated }) => {
       <h2 className="text-lg font-medium text-gray-900 mb-6">Create New Ticket</h2>
       
       <div className="bg-white shadow rounded-lg p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleFormSubmit} className="space-y-6">
           {error && (
             <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded">
               {error}
