@@ -12,10 +12,18 @@ from datetime import datetime, timedelta
 import jwt
 import hashlib
 from enum import Enum
+from email_utils import send_email
 
 ROOT_DIR = Path(__file__).parent
 from dotenv import load_dotenv
 load_dotenv(ROOT_DIR / '.env')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -259,7 +267,22 @@ async def create_ticket(ticket_data: TicketCreate, current_user: dict = Depends(
     response_data = ticket.dict()
     response_data["created_by_name"] = creator["name"]
     response_data["assigned_to_name"] = None
-    
+
+    # Send email notification
+    try:
+        await send_email(
+            subject=f"Ticket Created: {ticket.title}",
+            recipients=[creator["email"]],
+            template_body=f"""
+            <p>Hi {creator['name']},</p>
+            <p>Your ticket with the title "<strong>{ticket.title}</strong>" has been successfully created.</p>
+            <p>You will be notified of any updates.</p>
+            <p>Thank you!</p>
+            """
+        )
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+
     return TicketResponse(**response_data)
 
 @api_router.get("/tickets", response_model=List[TicketResponse])
@@ -359,6 +382,21 @@ async def update_ticket(
     
     updated_ticket["created_by_name"] = creator["name"] if creator else "Unknown"
     updated_ticket["assigned_to_name"] = assignee["name"] if assignee else None
+
+    # Send email notification if status changed
+    if "status" in update_data and creator:
+        try:
+            await send_email(
+                subject=f"Ticket Status Updated: {updated_ticket['title']}",
+                recipients=[creator["email"]],
+                template_body=f"""
+                <p>Hi {creator['name']},</p>
+                <p>The status of your ticket "<strong>{updated_ticket['title']}</strong>" has been updated to <strong>{updated_ticket['status']}</strong>.</p>
+                <p>Thank you!</p>
+                """
+            )
+        except Exception as e:
+            logger.error(f"Error sending email: {e}")
     
     return TicketResponse(**updated_ticket)
 
@@ -386,6 +424,33 @@ async def add_comment(
     )
     
     await db.comments.insert_one(comment.dict())
+
+    # Send email notification
+    try:
+        creator = await db.users.find_one({"id": ticket["created_by"]})
+        recipients = []
+        if creator:
+            recipients.append(creator["email"])
+
+        if ticket.get("assigned_to"):
+            assignee = await db.users.find_one({"id": ticket["assigned_to"]})
+            if assignee and assignee["email"] not in recipients:
+                recipients.append(assignee["email"])
+        
+        if recipients:
+            await send_email(
+                subject=f"New Comment on Ticket: {ticket['title']}",
+                recipients=recipients,
+                template_body=f"""
+                <p>A new comment has been added to the ticket "<strong>{ticket['title']}</strong>".</p>
+                <p><strong>Comment:</strong></p>
+                <p>{comment.content}</p>
+                <p>Thank you!</p>
+                """
+            )
+    except Exception as e:
+        logger.error(f"Error sending email: {e}")
+
     return comment
 
 @api_router.get("/tickets/{ticket_id}/comments", response_model=List[Comment])
@@ -472,12 +537,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

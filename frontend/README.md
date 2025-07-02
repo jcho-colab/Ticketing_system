@@ -4,8 +4,11 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Available Scripts
 
-In the project directory, you can run:
+### MongoDB
+you need to download and install MongoDB Community Server from the official website. During installation, ensure you select the option to "Install MongoD as a Service". 
 
+In the project directory, you can run:
+### `npm install`
 ### `npm start`
 
 Runs the app in the development mode.\
