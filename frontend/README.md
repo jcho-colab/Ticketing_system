@@ -7,9 +7,11 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 ### MongoDB
 you need to download and install MongoDB Community Server from the official website. During installation, ensure you select the option to "Install MongoD as a Service". 
 
-In the project directory, you can run:
+In the project directory (cd frontend), you can run:
 ### `npm install`
 ### `npm start`
+
+the commands are likely npm start for the frontend and uvicorn server:app --reload for the backend.
 
 Runs the app in the development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
