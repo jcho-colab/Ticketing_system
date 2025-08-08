@@ -66,6 +66,10 @@ class TicketCategory(str, Enum):
     GENERAL = "general"
 
 # Models
+class Attachment(BaseModel):
+    filename: str
+    filepath: str
+
 class Ticket(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str = Field(..., max_length=120)
@@ -78,14 +82,14 @@ class Ticket(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     resolved_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
-    attachments: Optional[List[str]] = None
+    attachments: Optional[List[Attachment]] = None
 
 class TicketCreate(BaseModel):
     title: str = Field(..., max_length=120)
     description: str
     priority: TicketPriority
     category: TicketCategory
-    attachments: Optional[List[str]] = None
+    attachments: Optional[List[Attachment]] = None
     email: EmailStr
 
 class TicketUpdate(BaseModel):
@@ -105,7 +109,7 @@ class TicketResponse(BaseModel):
     updated_at: datetime
     resolved_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
-    attachments: Optional[List[str]] = None
+    attachments: Optional[List[Attachment]] = None
 
 class Comment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -131,7 +135,7 @@ async def create_ticket(
     logger.info(f"Received ticket creation request: title={title}, email={email}")
     try:
         # Handle file uploads
-        attachment_paths = []
+        attachment_objects = []
         if attachments:
             for file in attachments:
                 if file.filename:
@@ -144,17 +148,18 @@ async def create_ticket(
                     with open(file_path, "wb") as buffer:
                         shutil.copyfileobj(file.file, buffer)
                     
-                    # Store the relative path
-                    attachment_paths.append(f"uploads/{unique_filename}")
+                    # Store the original filename and the unique path
+                    attachment_objects.append(Attachment(filename=file.filename, filepath=f"uploads/{unique_filename}").dict())
         
-        ticket = Ticket(
-            title=title,
-            description=description,
-            priority=priority,
-            category=category,
-            created_by_email=email,
-            attachments=attachment_paths if attachment_paths else None
-        )
+        ticket_data = {
+            "title": title,
+            "description": description,
+            "priority": priority,
+            "category": category,
+            "created_by_email": email,
+            "attachments": attachment_objects if attachment_objects else None
+        }
+        ticket = Ticket(**ticket_data)
         result = await db.tickets.insert_one(ticket.dict())
         logger.info(f"Ticket created with ID: {result.inserted_id}")
         
@@ -162,11 +167,10 @@ async def create_ticket(
         try:
             # Format attachment list for email
             attachment_list = ""
-            if attachment_paths:
+            if attachment_objects:
                 attachment_list = "<ul>"
-                for path in attachment_paths:
-                    filename = Path(path).name
-                    attachment_list += f"<li>{filename}</li>"
+                for att in attachment_objects:
+                    attachment_list += f"<li>{att['filename']}</li>"
                 attachment_list += "</ul>"
             else:
                 attachment_list = "<p>None</p>"
@@ -231,6 +235,63 @@ async def update_ticket(ticket_id: str, ticket_update: TicketUpdate):
     
     updated_ticket = await db.tickets.find_one({"id": ticket_id})
     return TicketResponse(**updated_ticket)
+
+@api_router.post("/tickets/{ticket_id}/attachments", response_model=TicketResponse)
+async def add_attachments_to_ticket(
+    ticket_id: str,
+    attachments: List[UploadFile] = File(...)
+):
+    ticket = await db.tickets.find_one({"id": ticket_id})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    attachment_objects = ticket.get("attachments") or []
+
+    for file in attachments:
+        if file.filename:
+            file_extension = Path(file.filename).suffix
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            file_path = UPLOADS_DIR / unique_filename
+
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            attachment_objects.append(Attachment(filename=file.filename, filepath=f"uploads/{unique_filename}").dict())
+
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {"attachments": attachment_objects, "updated_at": datetime.utcnow()}}
+    )
+
+    updated_ticket = await db.tickets.find_one({"id": ticket_id})
+    return TicketResponse(**updated_ticket)
+
+@api_router.delete("/tickets/{ticket_id}/attachments/{filename}")
+async def delete_attachment_from_ticket(ticket_id: str, filename: str):
+    ticket = await db.tickets.find_one({"id": ticket_id})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    attachment_path = f"uploads/{filename}"
+
+    # Check if the attachment exists
+    if not any(att['filepath'] == attachment_path for att in ticket.get("attachments", [])):
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Remove from database
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$pull": {"attachments": {"filepath": attachment_path}}}
+    )
+
+    # Remove from filesystem
+    try:
+        os.remove(UPLOADS_DIR / filename)
+    except FileNotFoundError:
+        logger.warning(f"Attachment file not found for deletion: {filename}")
+        pass
+
+    return {"message": "Attachment deleted successfully"}
 
 # Comment Routes
 @api_router.post("/tickets/{ticket_id}/comments", response_model=Comment)

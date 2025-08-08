@@ -439,6 +439,11 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editablePriority, setEditablePriority] = useState(ticket.priority);
+  const [editableCategory, setEditableCategory] = useState(ticket.category);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     fetchComments();
@@ -472,6 +477,60 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
     }
   };
 
+  const handleUpdateTicket = async () => {
+    setUpdating(true);
+    setUpdateError('');
+    try {
+      await axios.put(`${API}/tickets/${ticket.id}`, {
+        priority: editablePriority,
+        category: editableCategory,
+      });
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Failed to update ticket:', error);
+      setUpdateError('Failed to update ticket. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (filename) => {
+    if (window.confirm('Are you sure you want to delete this attachment?')) {
+      try {
+        await axios.delete(`${API}/tickets/${ticket.id}/attachments/${filename}`);
+        onUpdate();
+        onClose();
+      } catch (error) {
+        console.error('Failed to delete attachment:', error);
+        alert('Failed to delete attachment.');
+      }
+    }
+  };
+
+  const handleAddNewAttachments = async (event) => {
+    const files = event.target.files;
+    if (files.length === 0) return;
+
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('attachments', file);
+    }
+
+    try {
+      await axios.post(`${API}/tickets/${ticket.id}/attachments`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Failed to add attachments:', error);
+      alert('Failed to add attachments.');
+    }
+  };
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'critical': return 'bg-red-100 text-red-800 border-red-200';
@@ -492,6 +551,32 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
     }
   };
 
+  const renderAttachmentPreview = (attachment) => {
+    const attachmentUrl = `${BACKEND_URL}/${attachment.filepath}`;
+    const uniqueFilename = attachment.filepath.split('/').pop();
+    const isImage = /\.(jpe?g|png|gif)$/i.test(attachment.filename);
+
+    return (
+        <div className="relative group">
+            {isImage ? (
+                <a href={attachmentUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={attachmentUrl} alt={attachment.filename} className="w-20 h-20 object-cover rounded-md" />
+                </a>
+            ) : (
+                <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                    {attachment.filename}
+                </a>
+            )}
+            <button
+                onClick={() => handleDeleteAttachment(uniqueFilename)}
+                className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                &times;
+            </button>
+        </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
@@ -499,9 +584,16 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <h3 className="text-lg font-medium text-gray-900">{ticket.title}</h3>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(ticket.priority)}`}>
-                {ticket.priority}
-              </span>
+              <select
+                value={editablePriority}
+                onChange={(e) => setEditablePriority(e.target.value)}
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(editablePriority)}`}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
                 {ticket.status.replace('_', ' ')}
               </span>
@@ -566,7 +658,15 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-gray-700">Category</label>
-                <p className="text-sm text-gray-900 capitalize">{ticket.category}</p>
+                <select
+                  value={editableCategory}
+                  onChange={(e) => setEditableCategory(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm capitalize"
+                >
+                  <option value="general">General</option>
+                  <option value="technical">Technical</option>
+                  <option value="billing">Billing</option>
+                </select>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Created</label>
@@ -579,15 +679,50 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
               {ticket.attachments && ticket.attachments.length > 0 && (
                 <div>
                   <label className="text-sm font-medium text-gray-700">Attachments</label>
-                  <ul className="text-sm text-gray-900 list-disc pl-5">
+                  <div className="mt-2 grid grid-cols-2 gap-4">
                     {ticket.attachments.map((attachment, index) => (
-                      <li key={index}>{attachment}</li>
+                      <div key={index} className="flex items-center space-x-2">
+                        {renderAttachmentPreview(attachment)}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
+                 <div>
+                    <input
+                        type="file"
+                        multiple
+                        ref={fileInputRef}
+                        onChange={handleAddNewAttachments}
+                        className="hidden"
+                    />
+                    <button
+                        onClick={() => fileInputRef.current.click()}
+                        className="w-full mt-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300"
+                    >
+                        Add Attachment
+                    </button>
+                 </div>
             </div>
           </div>
+        </div>
+        <div className="mt-6 flex justify-end space-x-4">
+            {updateError && (
+                <p className="text-sm text-red-600 self-center">{updateError}</p>
+            )}
+            <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            >
+                Cancel
+            </button>
+            <button
+                onClick={handleUpdateTicket}
+                disabled={updating}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+                {updating ? 'Updating...' : 'Update Ticket'}
+            </button>
         </div>
       </div>
     </div>
