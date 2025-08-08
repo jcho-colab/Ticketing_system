@@ -131,6 +131,16 @@ const Dashboard = ({ userEmail }) => {
             >
               Create New Ticket
             </button>
+            <button
+              onClick={() => setActiveTab('kpi')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'kpi'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              KPI Dashboard
+            </button>
           </nav>
         </div>
 
@@ -138,6 +148,7 @@ const Dashboard = ({ userEmail }) => {
           <TicketsList tickets={tickets} loading={loading} onRefresh={fetchTickets} onTicketClick={openTicketModal} />
         )}
         {activeTab === 'create' && <CreateTicketForm onTicketCreated={fetchTickets} userEmail={userEmail} />}
+        {activeTab === 'kpi' && <KpiDashboard />}
       </div>
 
       {showTicketModal && selectedTicket && (
@@ -166,10 +177,11 @@ const TicketsList = ({ tickets, loading, onRefresh, onTicketClick }) => {
     
       const getStatusColor = (status) => {
         switch (status) {
-          case 'open': return 'bg-blue-100 text-blue-800';
-          case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-          case 'resolved': return 'bg-green-100 text-green-800';
-          case 'closed': return 'bg-gray-100 text-gray-800';
+          case 'new': return 'bg-blue-100 text-blue-800';
+          case 'blocked': return 'bg-red-100 text-red-800';
+          case 'pending': return 'bg-yellow-100 text-yellow-800';
+          case 'cancelled': return 'bg-gray-100 text-gray-800';
+          case 'closed': return 'bg-green-100 text-green-800';
           default: return 'bg-gray-100 text-gray-800';
         }
       };
@@ -241,6 +253,7 @@ const CreateTicketForm = ({ onTicketCreated, userEmail }) => {
     description: '',
     priority: 'medium',
     category: 'general',
+    department: 'GTS',
     email: userEmail,
   });
   const [attachments, setAttachments] = useState([]);
@@ -267,6 +280,7 @@ const CreateTicketForm = ({ onTicketCreated, userEmail }) => {
       formDataObj.append('description', formData.description);
       formDataObj.append('priority', formData.priority);
       formDataObj.append('category', formData.category);
+      formDataObj.append('department', formData.department);
       formDataObj.append('email', formData.email);
       
       // Add attachments if any
@@ -292,6 +306,7 @@ const CreateTicketForm = ({ onTicketCreated, userEmail }) => {
           description: '',
           priority: 'medium',
           category: 'general',
+          department: 'GTS',
           email: userEmail,
         });
         setAttachments([]);
@@ -418,6 +433,20 @@ const CreateTicketForm = ({ onTicketCreated, userEmail }) => {
                 <option value="billing">Billing</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Department</label>
+              <select
+                name="department"
+                value={formData.department}
+                onChange={handleInputChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="GTS">GTS</option>
+                <option value="Strategy">Strategy</option>
+                <option value="Customs">Customs</option>
+                <option value="Classification">Classification</option>
+              </select>
+            </div>
           </div>
           <div>
             <button
@@ -441,6 +470,7 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
   const [loading, setLoading] = useState(false);
   const [editablePriority, setEditablePriority] = useState(ticket.priority);
   const [editableCategory, setEditableCategory] = useState(ticket.category);
+  const [editableStatus, setEditableStatus] = useState(ticket.status);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const fileInputRef = React.useRef(null);
@@ -484,6 +514,7 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
       await axios.put(`${API}/tickets/${ticket.id}`, {
         priority: editablePriority,
         category: editableCategory,
+        status: editableStatus,
       });
       onUpdate();
       onClose();
@@ -543,10 +574,11 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'open': return 'bg-blue-100 text-blue-800';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
-      case 'resolved': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
+      case 'new': return 'bg-blue-100 text-blue-800';
+      case 'blocked': return 'bg-red-100 text-red-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled': return 'bg-gray-100 text-gray-800';
+      case 'closed': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -594,9 +626,17 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
                 <option value="high">High</option>
                 <option value="critical">Critical</option>
               </select>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}`}>
-                {ticket.status.replace('_', ' ')}
-              </span>
+              <select
+                value={editableStatus}
+                onChange={(e) => setEditableStatus(e.target.value)}
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(editableStatus)}`}
+              >
+                <option value="new">New</option>
+                <option value="blocked">Blocked</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="closed">Closed</option>
+              </select>
             </div>
             <div className="text-sm text-gray-500 space-x-4">
               <span>#{ticket.id.substring(0, 8)}</span>
@@ -669,6 +709,10 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
                 </select>
               </div>
               <div>
+                <label className="text-sm font-medium text-gray-700">Department</label>
+                <p className="text-sm text-gray-900 capitalize">{ticket.department}</p>
+              </div>
+              <div>
                 <label className="text-sm font-medium text-gray-700">Created</label>
                 <p className="text-sm text-gray-900">{new Date(ticket.created_at).toLocaleString()}</p>
               </div>
@@ -723,6 +767,87 @@ const TicketModal = ({ ticket, onClose, onUpdate, userEmail }) => {
             >
                 {updating ? 'Updating...' : 'Update Ticket'}
             </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// KPI Dashboard Component
+const KpiDashboard = () => {
+  const [kpiData, setKpiData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchKpiData = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API}/dashboard/kpi`);
+        setKpiData(response.data);
+      } catch (err) {
+        setError('Failed to fetch KPI data.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchKpiData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-red-500 text-center py-12">{error}</div>;
+  }
+
+  if (!kpiData) {
+    return <div className="text-center py-12">No KPI data available.</div>;
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">KPI Dashboard</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white shadow rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Tickets per Week</h3>
+          <ul>
+            {Object.entries(kpiData.tickets_per_week).map(([week, count]) => (
+              <li key={week} className="flex justify-between py-1">
+                <span>Week {week}:</span>
+                <span className="font-semibold">{count} tickets</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="bg-white shadow rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Tickets per Month</h3>
+          <ul>
+            {Object.entries(kpiData.tickets_per_month).map(([month, count]) => (
+              <li key={month} className="flex justify-between py-1">
+                <span>Month {month}:</span>
+                <span className="font-semibold">{count} tickets</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="bg-white shadow rounded-lg p-6 md:col-span-2">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Average Resolution Time by Department (Hours)</h3>
+          <ul>
+            {Object.entries(kpiData.avg_resolution_time_by_department).map(([dept, time]) => (
+              <li key={dept} className="flex justify-between py-1">
+                <span>{dept}:</span>
+                <span className="font-semibold">{Number(time).toFixed(2)} hours</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>

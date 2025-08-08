@@ -49,10 +49,17 @@ api_router = APIRouter(prefix="/api")
 
 # Enums
 class TicketStatus(str, Enum):
-    OPEN = "open"
-    IN_PROGRESS = "in_progress"
-    RESOLVED = "resolved"
+    NEW = "new"
+    BLOCKED = "blocked"
+    PENDING = "pending"
+    CANCELLED = "cancelled"
     CLOSED = "closed"
+
+class TicketDepartment(str, Enum):
+    GTS = "GTS"
+    STRATEGY = "Strategy"
+    CUSTOMS = "Customs"
+    CLASSIFICATION = "Classification"
 
 class TicketPriority(str, Enum):
     CRITICAL = "critical"
@@ -76,7 +83,8 @@ class Ticket(BaseModel):
     description: str
     priority: TicketPriority
     category: TicketCategory
-    status: TicketStatus = TicketStatus.OPEN
+    department: TicketDepartment
+    status: TicketStatus = TicketStatus.NEW
     created_by_email: EmailStr
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -89,12 +97,14 @@ class TicketCreate(BaseModel):
     description: str
     priority: TicketPriority
     category: TicketCategory
+    department: TicketDepartment
     attachments: Optional[List[Attachment]] = None
     email: EmailStr
 
 class TicketUpdate(BaseModel):
     priority: Optional[TicketPriority] = None
     category: Optional[TicketCategory] = None
+    department: Optional[TicketDepartment] = None
     status: Optional[TicketStatus] = None
 
 class TicketResponse(BaseModel):
@@ -103,6 +113,7 @@ class TicketResponse(BaseModel):
     description: str
     priority: TicketPriority
     category: TicketCategory
+    department: TicketDepartment
     status: TicketStatus
     created_by_email: EmailStr
     created_at: datetime
@@ -129,6 +140,7 @@ async def create_ticket(
     description: str = Form(...),
     priority: TicketPriority = Form(...),
     category: TicketCategory = Form(...),
+    department: TicketDepartment = Form(...),
     email: EmailStr = Form(...),
     attachments: List[UploadFile] = File([])
 ):
@@ -156,6 +168,7 @@ async def create_ticket(
             "description": description,
             "priority": priority,
             "category": category,
+            "department": department,
             "created_by_email": email,
             "attachments": attachment_objects if attachment_objects else None
         }
@@ -221,19 +234,48 @@ async def update_ticket(ticket_id: str, ticket_update: TicketUpdate):
     ticket = await db.tickets.find_one({"id": ticket_id})
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    original_ticket = ticket.copy()
     
     update_data = {k: v for k, v in ticket_update.dict().items() if v is not None}
     update_data["updated_at"] = datetime.utcnow()
     
     if "status" in update_data:
-        if update_data["status"] == TicketStatus.RESOLVED.value:
-            update_data["resolved_at"] = datetime.utcnow()
-        elif update_data["status"] == TicketStatus.CLOSED.value:
+        if update_data["status"] in [TicketStatus.CLOSED.value, TicketStatus.CANCELLED.value]:
             update_data["closed_at"] = datetime.utcnow()
             
     await db.tickets.update_one({"id": ticket_id}, {"$set": update_data})
     
     updated_ticket = await db.tickets.find_one({"id": ticket_id})
+
+    # Send notification email
+    try:
+        changes = []
+        if ticket_update.priority and ticket_update.priority != original_ticket.get("priority"):
+            changes.append(f"Priority changed from {original_ticket.get('priority')} to {ticket_update.priority}")
+        if ticket_update.category and ticket_update.category != original_ticket.get("category"):
+            changes.append(f"Category changed from {original_ticket.get('category')} to {ticket_update.category}")
+        if ticket_update.department and ticket_update.department != original_ticket.get("department"):
+            changes.append(f"Department changed from {original_ticket.get('department')} to {ticket_update.department}")
+        if ticket_update.status and ticket_update.status != original_ticket.get("status"):
+            changes.append(f"Status changed from {original_ticket.get('status')} to {ticket_update.status}")
+
+        if changes:
+            email_body = f"""
+            <h2>Your Ticket Has Been Updated</h2>
+            <p>The following changes were made to your ticket (ID: {ticket_id}):</p>
+            <ul>
+                {''.join(f'<li>{change}</li>' for change in changes)}
+            </ul>
+            """
+            await send_email(
+                subject=f"Ticket Updated: {updated_ticket['title']}",
+                recipients=[updated_ticket['created_by_email']],
+                template_body=email_body
+            )
+    except Exception as e:
+        logger.error(f"Failed to send update notification email: {e}")
+
     return TicketResponse(**updated_ticket)
 
 @api_router.post("/tickets/{ticket_id}/attachments", response_model=TicketResponse)
@@ -293,6 +335,73 @@ async def delete_attachment_from_ticket(ticket_id: str, filename: str):
 
     return {"message": "Attachment deleted successfully"}
 
+from datetime import timedelta
+
+class KpiData(BaseModel):
+    tickets_per_week: dict
+    tickets_per_month: dict
+    avg_resolution_time_by_department: dict
+
+@api_router.get("/dashboard/kpi", response_model=KpiData)
+async def get_kpi_data():
+    # Tickets per week
+    tickets_per_week_pipeline = [
+        {
+            "$group": {
+                "_id": { "$week": "$created_at" },
+                "count": { "$sum": 1 }
+            }
+        },
+        { "$sort": { "_id": 1 } }
+    ]
+    tickets_per_week = await db.tickets.aggregate(tickets_per_week_pipeline).to_list(length=None)
+
+    # Tickets per month
+    tickets_per_month_pipeline = [
+        {
+            "$group": {
+                "_id": { "$month": "$created_at" },
+                "count": { "$sum": 1 }
+            }
+        },
+        { "$sort": { "_id": 1 } }
+    ]
+    tickets_per_month = await db.tickets.aggregate(tickets_per_month_pipeline).to_list(length=None)
+
+    # Average resolution time by department
+    avg_resolution_time_pipeline = [
+        {
+            "$match": {
+                "status": { "$in": [TicketStatus.CLOSED.value, TicketStatus.CANCELLED.value] },
+                "closed_at": { "$exists": True }
+            }
+        },
+        {
+            "$project": {
+                "department": 1,
+                "resolution_time": { "$subtract": ["$closed_at", "$created_at"] }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$department",
+                "avg_resolution_time": { "$avg": "$resolution_time" }
+            }
+        }
+    ]
+    avg_resolution_time = await db.tickets.aggregate(avg_resolution_time_pipeline).to_list(length=None)
+
+    # Convert average resolution time from milliseconds to hours
+    avg_resolution_time_by_department = {
+        item["_id"]: item["avg_resolution_time"] / (1000 * 60 * 60) for item in avg_resolution_time
+    }
+
+    return KpiData(
+        tickets_per_week={item["_id"]: item["count"] for item in tickets_per_week},
+        tickets_per_month={item["_id"]: item["count"] for item in tickets_per_month},
+        avg_resolution_time_by_department=avg_resolution_time_by_department
+    )
+
 # Comment Routes
 @api_router.post("/tickets/{ticket_id}/comments", response_model=Comment)
 async def add_comment(ticket_id: str, comment_data: CommentCreate):
@@ -307,6 +416,23 @@ async def add_comment(ticket_id: str, comment_data: CommentCreate):
     )
     
     await db.comments.insert_one(comment.dict())
+
+    # Send notification email
+    try:
+        email_body = f"""
+        <h2>New Comment on Your Ticket</h2>
+        <p>A new comment has been added to your ticket (ID: {ticket_id}):</p>
+        <p><strong>{comment_data.email}:</strong></p>
+        <p>{comment_data.content}</p>
+        """
+        await send_email(
+            subject=f"New Comment on Ticket: {ticket['title']}",
+            recipients=[ticket['created_by_email']],
+            template_body=email_body
+        )
+    except Exception as e:
+        logger.error(f"Failed to send new comment notification email: {e}")
+
     return comment
 
 @api_router.get("/tickets/{ticket_id}/comments", response_model=List[Comment])
